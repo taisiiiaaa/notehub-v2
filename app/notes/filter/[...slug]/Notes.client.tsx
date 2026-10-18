@@ -65,7 +65,7 @@ const NotesClient = ({ tag }: NotesClientProps) => {
             <div className={styles.notesContainer}>
               <NoteList notes={data.notes} />
 
-              {isFetching && !isLoading && <Loader variant='fetching' />}
+              {isFetching && !isLoading && <Loader />}
             </div>
           )}
 
