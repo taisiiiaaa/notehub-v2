@@ -8,11 +8,10 @@ import Pagination from '@/components/Pagination/Pagination'
 import Loader from '@/components/Loader/Loader'
 import NoteList from '@/components/NoteList/NoteList'
 import ErrorMessage from '@/components/ErrorMessage/ErrorMessage'
-import Modal from '@/components/Modal/Modal'
-import NoteForm from '@/components/NoteForm/NoteForm'
 import EmptyState from '@/components/EmptyState/EmptyState'
 import styles from './Notes.module.css'
 import { NoteTag } from '@/types/note'
+import Link from 'next/link'
 
 interface NotesClientProps {
   tag?: NoteTag
@@ -22,7 +21,6 @@ const NotesClient = ({ tag }: NotesClientProps) => {
   const [searchInput, setSearchInput] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
-  const [isModalVisible, setIsModalVisible] = useState(false)
 
   const debouncedSearch = useDebouncedCallback((value: string) => {
     setSearchQuery(value)
@@ -41,10 +39,6 @@ const NotesClient = ({ tag }: NotesClientProps) => {
     debouncedSearch(value)
   }
 
-  const handleCloseModal = () => {
-    setIsModalVisible(false)
-  }
-
   return (
     <div className={styles.app}>
       <header className={styles.toolbar}>
@@ -58,9 +52,9 @@ const NotesClient = ({ tag }: NotesClientProps) => {
           />
         )}
 
-        <button onClick={() => setIsModalVisible(true)} className={styles.button}>
+        <Link href='/notes/action/create' className={styles.button}>
           Create note +
-        </button>
+        </Link>
       </header>
 
       <main>
@@ -83,12 +77,6 @@ const NotesClient = ({ tag }: NotesClientProps) => {
 
           {isSuccess && data.notes.length === 0 && (
             <EmptyState searchQuery={searchQuery} tag={tag} />
-          )}
-
-          {isModalVisible && (
-            <Modal onClose={handleCloseModal}>
-              <NoteForm onClose={handleCloseModal} />
-            </Modal>
           )}
         </section>
       </main>
