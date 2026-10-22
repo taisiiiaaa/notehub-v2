@@ -4,16 +4,32 @@ import type { NoteTag } from '@/types/note'
 import NotesClient from './Notes.client'
 import { Metadata } from 'next'
 
-type generateMetadataProps = {
-  params: Promise<{ slug: string[] }>
-}
-
-export async function generateMetadata({ params }: generateMetadataProps): Promise<Metadata> {
+export async function generateMetadata({ params }: NotesByCategoryProps): Promise<Metadata> {
   const { slug } = await params
   const selectedTag = slug[0]
+
+  const title = `${selectedTag === 'all' ? 'My Notes' : selectedTag} | NoteHub`
+  const description =
+    selectedTag === 'all'
+      ? 'View and manage all your notes in NoteHub.'
+      : `View and manage your ${selectedTag} notes in NoteHub.`
+
   return {
-    title: `${selectedTag === 'all' ? 'My Notes | ' : selectedTag + ' | '}NoteHub`,
-    description: `Notes filtered by category: ${slug}`,
+    title,
+    description,
+    openGraph: {
+      title,
+      description,
+      url: `/notes/filter/${slug.join('/')}`,
+      images: [
+        {
+          url: 'https://ac.goit.global/fullstack/react/og-meta.jpg',
+          width: 1200,
+          height: 630,
+          alt: `${title} — NoteHub`,
+        },
+      ],
+    },
   }
 }
 
