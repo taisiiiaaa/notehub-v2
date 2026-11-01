@@ -1,11 +1,20 @@
+'use client'
 import type { ReactNode } from 'react'
+import { useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface AuthLayoutProps {
   children: ReactNode
 }
 
 const AuthLayout = ({ children }: AuthLayoutProps) => {
-  return <section>{children} </section>
+  const router = useRouter()
+
+  useEffect(() => {
+    router.refresh()
+  }, [router])
+
+  return <section>{children}</section>
 }
 
 export default AuthLayout

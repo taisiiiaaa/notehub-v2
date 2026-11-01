@@ -18,14 +18,13 @@ export default function EditProfilePage() {
 
   const updateProfile = async (_prevState: FormState, formData: FormData): Promise<FormState> => {
     const username = String(formData.get('username') ?? '').trim()
-    const email = String(formData.get('email') ?? '').trim()
 
-    if (!username || !email) {
-      return { error: 'Username and email are required.' }
+    if (!username) {
+      return { error: 'Username is required.' }
     }
 
     try {
-      const updatedUser = await updateMe({ username, email })
+      const updatedUser = await updateMe({ username })
 
       setUser(updatedUser)
       router.push('/profile')
@@ -77,7 +76,7 @@ export default function EditProfilePage() {
               type='email'
               defaultValue={user.email}
               className={styles.input}
-              required
+              readOnly
             />
           </div>
 

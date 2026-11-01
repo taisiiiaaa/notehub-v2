@@ -1,8 +1,8 @@
-import { CreateNote, Note, NoteTag } from '@/types/note'
+import type { CreateNote, Note, NoteTag } from '@/types/note'
+import type { User } from '@/types/user'
 import { api } from './api'
-import { User } from '@/types/user'
 
-interface Response {
+interface NotesResponse {
   notes: Note[]
   totalPages: number
 }
@@ -16,66 +16,40 @@ interface AuthResponse {
   user: User
 }
 
+export interface UpdateUserRequest {
+  username: string
+}
+
 export const fetchNotes = async (
   page: number,
   search: string,
   tag?: NoteTag
-): Promise<Response> => {
-  const params = new URLSearchParams({
-    page: String(page),
-    search,
-    perPage: '12',
+): Promise<NotesResponse> => {
+  const { data } = await api.get<NotesResponse>('/notes', {
+    params: {
+      page,
+      search,
+      perPage: 12,
+      ...(tag ? { tag } : {}),
+    },
   })
 
-  if (tag) {
-    params.set('tag', tag)
-  }
-
-  const response = await fetch(`/api/notes?${params.toString()}`)
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch notes: ${response.status}`)
-  }
-
-  return response.json()
+  return data
 }
 
 export const createNote = async (newNote: CreateNote): Promise<Note> => {
-  const response = await fetch('/api/notes', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(newNote),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to create note: ${response.status}`)
-  }
-
-  return response.json()
+  const { data } = await api.post<Note>('/notes', newNote)
+  return data
 }
 
 export const deleteNote = async (noteId: string): Promise<Note> => {
-  const response = await fetch(`/api/notes/${noteId}`, {
-    method: 'DELETE',
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to delete note: ${response.status}`)
-  }
-
-  return response.json()
+  const { data } = await api.delete<Note>(`/notes/${noteId}`)
+  return data
 }
 
 export const fetchNoteById = async (noteId: string): Promise<Note> => {
-  const response = await fetch(`/api/notes/${noteId}`)
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch note: ${response.status}`)
-  }
-
-  return response.json()
+  const { data } = await api.get<Note>(`/notes/${noteId}`)
+  return data
 }
 
 export const register = async (credentials: AuthRequest): Promise<AuthResponse> => {
@@ -85,71 +59,30 @@ export const register = async (credentials: AuthRequest): Promise<AuthResponse> 
 }
 
 export const login = async (credentials: AuthRequest): Promise<AuthResponse> => {
-  const response = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(credentials),
-  })
-
-  const data: AuthResponse = await response.json()
-
-  if (!response.ok) {
-    throw new Error('Login failed')
-  }
+  const { data } = await api.post<AuthResponse>('/auth/login', credentials)
 
   return data
 }
 
 export const logout = async (): Promise<void> => {
-  await fetch('/api/auth/logout', {
-    method: 'POST',
-  })
+  await api.post('/auth/logout')
 }
 
-export const checkSession = async (): Promise<void> => {
-  const response = await fetch('/api/auth/session', {
-    method: 'GET',
-  })
+export interface SessionResponse {
+  message: string
+}
 
-  if (!response.ok) {
-    throw new Error('No active session')
-  }
+export const checkSession = async (): Promise<SessionResponse> => {
+  const { data } = await api.get<SessionResponse>('/auth/session')
+  return data
 }
 
 export const getMe = async (): Promise<User> => {
-  const response = await fetch('/api/users/me')
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch user: ${response.status}`)
-  }
-
-  return response.json()
-}
-
-export interface UpdateUserRequest {
-  username: string
-  email: string
-}
-
-export interface UpdateUserRequest {
-  username: string
-  email: string
+  const { data } = await api.get<User>('/users/me')
+  return data
 }
 
 export const updateMe = async (userData: UpdateUserRequest): Promise<User> => {
-  const response = await fetch('/api/users/me', {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(userData),
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to update profile: ${response.status}`)
-  }
-
-  return response.json()
+  const { data } = await api.patch<User>('/users/me', userData)
+  return data
 }

@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers'
 import { api } from './api'
 import type { User } from '@/types/user'
-import axios from 'axios'
-import { Note, NoteTag } from '@/types/note'
+import type { Note, NoteTag } from '@/types/note'
+import type { AxiosResponse } from 'axios'
 
 interface NotesResponse {
   notes: Note[]
@@ -16,12 +16,12 @@ export async function fetchNotes(
 ): Promise<NotesResponse> {
   const cookieStore = await cookies()
 
-  const { data } = await axios.get<NotesResponse>(`${process.env.NEXT_PUBLIC_API_URL}/notes`, {
+  const { data } = await api.get<NotesResponse>('/notes', {
     params: {
       page,
       search,
       perPage: 12,
-      ...(tag && { tag }),
+      ...(tag ? { tag } : {}),
     },
     headers: {
       Cookie: cookieStore.toString(),
@@ -32,19 +32,23 @@ export async function fetchNotes(
 }
 
 export const fetchNoteById = async (noteId: string): Promise<Note> => {
-  const response = await fetch(`/api/notes/${noteId}`)
+  const cookieStore = await cookies()
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch note: ${response.status}`)
-  }
+  const { data } = await api.get<Note>(`/notes/${noteId}`, {
+    headers: {
+      Cookie: cookieStore.toString(),
+    },
+  })
 
-  return response.json()
+  return data
 }
 
-export const checkSession = async (cookieHeader?: string): Promise<void> => {
+export const checkSession = async (
+  cookieHeader?: string
+): Promise<AxiosResponse<{ message: string }>> => {
   const cookie = cookieHeader ?? (await cookies()).toString()
 
-  await api.get('/auth/session', {
+  return api.get<{ message: string }>('/auth/session', {
     headers: {
       Cookie: cookie,
     },
@@ -53,30 +57,12 @@ export const checkSession = async (cookieHeader?: string): Promise<void> => {
 
 export const getMe = async (): Promise<User> => {
   const cookieStore = await cookies()
-  const cookieHeader = cookieStore.toString()
 
-  console.log(
-    'Authentication cookie names:',
-    cookieStore.getAll().map(cookie => cookie.name)
-  )
+  const { data } = await api.get<User>('/users/me', {
+    headers: {
+      Cookie: cookieStore.toString(),
+    },
+  })
 
-  console.log('Has access token:', cookieStore.has('accessToken'))
-  console.log('Has refresh token:', cookieStore.has('refreshToken'))
-
-  try {
-    const { data } = await api.get<User>('/users/me', {
-      headers: {
-        Cookie: cookieHeader,
-      },
-    })
-
-    return data
-  } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error('Profile request status:', error.response?.status)
-      console.error('Profile request response:', error.response?.data)
-    }
-
-    throw error
-  }
+  return data
 }
