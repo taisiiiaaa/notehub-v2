@@ -87,11 +87,7 @@ export default function EditProfilePage() {
               {isPending ? 'Saving...' : 'Save'}
             </button>
 
-            <button
-              type='button'
-              className={styles.cancelButton}
-              onClick={() => router.push('/profile')}
-            >
+            <button type='button' className={styles.cancelButton} onClick={() => router.back()}>
               Cancel
             </button>
           </div>

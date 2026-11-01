@@ -1,12 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { api } from '@/lib/api/api'
 import { parseSetCookie } from 'cookie'
+import type { SerializeOptions } from 'cookie'
+import { checkSession } from './lib/api/serverApi'
 
 const privateRoutes = ['/profile', '/notes']
 const publicRoutes = ['/sign-in', '/sign-up']
 
 function isRoute(pathname: string, routes: string[]) {
   return routes.some(route => pathname === route || pathname.startsWith(`${route}/`))
+}
+
+function applySetCookies(response: NextResponse, setCookieHeaders: string[]) {
+  for (const cookieString of setCookieHeaders) {
+    const parsed = parseSetCookie(cookieString)
+
+    if (!parsed.name) continue
+
+    const options: SerializeOptions = {
+      httpOnly: parsed.httpOnly,
+      secure: parsed.secure,
+      sameSite: parsed.sameSite,
+      path: parsed.path,
+      expires: parsed.expires,
+      maxAge: parsed.maxAge,
+    }
+
+    response.cookies.set(parsed.name, parsed.value ?? '', options)
+  }
 }
 
 export async function proxy(request: NextRequest) {
@@ -28,78 +48,30 @@ export async function proxy(request: NextRequest) {
       : NextResponse.next()
   }
 
-  if (!accessToken && refreshToken) {
-    try {
-      const refreshResponse = await api.get('/auth/session', {
-        headers: {
-          Cookie: `refreshToken=${refreshToken}`,
-        },
-      })
-
-      const response = isPublicRoute
-        ? NextResponse.redirect(new URL('/', request.url))
-        : NextResponse.next()
-
-      const setCookieHeaders = refreshResponse.headers['set-cookie'] ?? []
-
-      for (const cookieString of setCookieHeaders) {
-        const parsed = parseSetCookie(cookieString)
-
-        if (parsed.name && parsed.value) {
-          response.cookies.set(parsed.name, parsed.value, {
-            httpOnly: parsed.httpOnly,
-            secure: parsed.secure,
-            sameSite: parsed.sameSite,
-            path: parsed.path,
-            expires: parsed.expires,
-            maxAge: parsed.maxAge,
-          })
-        }
-      }
-
-      return response
-    } catch (error) {
-      console.error('Session refresh failed:', error)
-
-      return isPrivateRoute
-        ? NextResponse.redirect(new URL('/sign-in', request.url))
-        : NextResponse.next()
-    }
-  }
-
   try {
-    const cookieHeader = request.headers.get('cookie') ?? ''
+    const cookieHeader = request.cookies
+      .getAll()
+      .map(cookie => `${cookie.name}=${cookie.value}`)
+      .join('; ')
 
-    const sessionResponse = await api.get('/auth/session', {
-      headers: {
-        Cookie: cookieHeader,
-      },
-    })
+    const sessionResponse = await checkSession(cookieHeader)
 
     const response = isPublicRoute
       ? NextResponse.redirect(new URL('/', request.url))
       : NextResponse.next()
 
-    const setCookieHeaders = sessionResponse.headers['set-cookie'] ?? []
+    const rawSetCookie = sessionResponse.headers['set-cookie']
+    const setCookieHeaders = Array.isArray(rawSetCookie)
+      ? rawSetCookie
+      : rawSetCookie
+        ? [rawSetCookie]
+        : []
 
-    for (const cookieString of setCookieHeaders) {
-      const parsed = parseSetCookie(cookieString)
-
-      if (parsed.name && parsed.value) {
-        response.cookies.set(parsed.name, parsed.value, {
-          httpOnly: parsed.httpOnly,
-          secure: parsed.secure,
-          sameSite: parsed.sameSite,
-          path: parsed.path,
-          expires: parsed.expires,
-          maxAge: parsed.maxAge,
-        })
-      }
-    }
+    applySetCookies(response, setCookieHeaders)
 
     return response
   } catch (error) {
-    console.error('Session validation failed:', error)
+    console.error('Session check/refresh failed:', error)
 
     return isPrivateRoute
       ? NextResponse.redirect(new URL('/sign-in', request.url))
