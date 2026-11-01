@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { parseSetCookie } from 'cookie'
-import type { SerializeOptions } from 'cookie'
 import { checkSession } from './lib/api/serverApi'
 
 const privateRoutes = ['/profile', '/notes']
@@ -13,19 +12,16 @@ function isRoute(pathname: string, routes: string[]) {
 function applySetCookies(response: NextResponse, setCookieHeaders: string[]) {
   for (const cookieString of setCookieHeaders) {
     const parsed = parseSetCookie(cookieString)
-
     if (!parsed.name) continue
 
-    const options: SerializeOptions = {
+    response.cookies.set(parsed.name, parsed.value ?? '', {
       httpOnly: parsed.httpOnly,
       secure: parsed.secure,
       sameSite: parsed.sameSite,
       path: parsed.path,
       expires: parsed.expires,
       maxAge: parsed.maxAge,
-    }
-
-    response.cookies.set(parsed.name, parsed.value ?? '', options)
+    })
   }
 }
 
@@ -48,12 +44,15 @@ export async function proxy(request: NextRequest) {
       : NextResponse.next()
   }
 
+  if (accessToken) {
+    return isPublicRoute ? NextResponse.redirect(new URL('/', request.url)) : NextResponse.next()
+  }
+
   try {
     const cookieHeader = request.cookies
       .getAll()
       .map(cookie => `${cookie.name}=${cookie.value}`)
       .join('; ')
-
     const sessionResponse = await checkSession(cookieHeader)
 
     const response = isPublicRoute
@@ -61,6 +60,7 @@ export async function proxy(request: NextRequest) {
       : NextResponse.next()
 
     const rawSetCookie = sessionResponse.headers['set-cookie']
+
     const setCookieHeaders = Array.isArray(rawSetCookie)
       ? rawSetCookie
       : rawSetCookie
@@ -69,10 +69,18 @@ export async function proxy(request: NextRequest) {
 
     applySetCookies(response, setCookieHeaders)
 
+    const refreshedAccessToken = setCookieHeaders.some(cookieString => {
+      const parsed = parseSetCookie(cookieString)
+      return parsed.name === 'accessToken' && Boolean(parsed.value)
+    })
+
+    if (isPrivateRoute && !refreshedAccessToken) {
+      return NextResponse.redirect(new URL('/sign-in', request.url))
+    }
+
     return response
   } catch (error) {
-    console.error('Session check/refresh failed:', error)
-
+    console.error('Session refresh failed:', error)
     return isPrivateRoute
       ? NextResponse.redirect(new URL('/sign-in', request.url))
       : NextResponse.next()
