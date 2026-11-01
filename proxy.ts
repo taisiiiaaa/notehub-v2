@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { cookies } from 'next/headers'
 import { parseSetCookie } from 'cookie'
 import { checkSession } from './lib/api/serverApi'
 
@@ -35,8 +36,9 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
   }
 
-  const accessToken = request.cookies.get('accessToken')?.value
-  const refreshToken = request.cookies.get('refreshToken')?.value
+  const cookieStore = await cookies()
+  const accessToken = cookieStore.get('accessToken')?.value
+  const refreshToken = cookieStore.get('refreshToken')?.value
 
   if (!accessToken && !refreshToken) {
     return isPrivateRoute
@@ -49,25 +51,18 @@ export async function proxy(request: NextRequest) {
   }
 
   try {
-    const cookieHeader = request.cookies
+    const cookieHeader = cookieStore
       .getAll()
       .map(cookie => `${cookie.name}=${cookie.value}`)
       .join('; ')
     const sessionResponse = await checkSession(cookieHeader)
 
-    const response = isPublicRoute
-      ? NextResponse.redirect(new URL('/', request.url))
-      : NextResponse.next()
-
     const rawSetCookie = sessionResponse.headers['set-cookie']
-
     const setCookieHeaders = Array.isArray(rawSetCookie)
       ? rawSetCookie
       : rawSetCookie
         ? [rawSetCookie]
         : []
-
-    applySetCookies(response, setCookieHeaders)
 
     const refreshedAccessToken = setCookieHeaders.some(cookieString => {
       const parsed = parseSetCookie(cookieString)
@@ -77,6 +72,12 @@ export async function proxy(request: NextRequest) {
     if (isPrivateRoute && !refreshedAccessToken) {
       return NextResponse.redirect(new URL('/sign-in', request.url))
     }
+
+    const response = isPublicRoute
+      ? NextResponse.redirect(new URL('/', request.url))
+      : NextResponse.next()
+
+    applySetCookies(response, setCookieHeaders)
 
     return response
   } catch (error) {
